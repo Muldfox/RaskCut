@@ -1,0 +1,81 @@
+# Builds RaskCut, bundles ffmpeg, makes the installer + portable zip and
+# publishes them as a GitHub Release. Runs when you push a tag like v1.2.0.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  # Pinned ffmpeg build (BtbN, GPL, shared = smaller). To update ffmpeg, pick a
+  # newer "autobuild-..." release on https://github.com/BtbN/FFmpeg-Builds/releases
+  # and change both lines below.
+  FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-n9.0.2-28-g669f5ab083-win64-gpl-shared-9.0.zip
+  FFMPEG_COMMIT: 669f5ab083
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that Cargo.toml version matches the tag
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+?)"').Matches[0].Groups[1].Value
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "Cargo.toml says $v but the tag is ${{ github.ref_name }}" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build RaskCut
+        run: cargo build --release
+
+      - name: Download ffmpeg and assemble dist folder
+        shell: pwsh
+        run: |
+          Invoke-WebRequest $env:FFMPEG_URL -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+          $root = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
+          New-Item -ItemType Directory dist, dist/licenses | Out-Null
+          Copy-Item target/release/RaskCut.exe dist/
+          Copy-Item "$root/bin/*" dist/
+          Copy-Item "$root/LICENSE.txt" dist/licenses/FFmpeg-LICENSE.txt
+          $ver = (& dist/ffmpeg.exe -version | Select-Object -First 1)
+          @"
+          RaskCut includes FFmpeg (ffmpeg, ffprobe, ffplay and their DLLs), licensed under the GPL.
+          $ver
+          Binaries: $env:FFMPEG_URL
+          Source code: https://github.com/FFmpeg/FFmpeg/tree/$env:FFMPEG_COMMIT
+          Build scripts: https://github.com/BtbN/FFmpeg-Builds
+          "@ | Out-File dist/licenses/FFmpeg-NOTICE.txt -Encoding utf8
+          if (Test-Path LICENSE) { Copy-Item LICENSE dist/licenses/RaskCut-LICENSE.txt }
+
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath "RaskCut-$env:VERSION-portable.zip"
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = (Get-ChildItem "C:\Program Files*\Inno Setup*\ISCC.exe" | Select-Object -First 1).FullName
+          & $iscc "/DAppVersion=$env:VERSION" installer/raskcut.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/Output/RaskCut-Setup-*.exe
+            RaskCut-*-portable.zip
+          body: |
+            **Download `RaskCut-Setup-${{ env.VERSION }}.exe`** and run it. Everything is included, ffmpeg too.
+            Prefer no installer? Use the portable zip, unzip it anywhere and run `RaskCut.exe`.
+
+            Windows may show "Windows protected your PC". Click **More info** then **Run anyway**.
+
+            FFmpeg is included under the GPL. Source: https://github.com/FFmpeg/FFmpeg/tree/${{ env.FFMPEG_COMMIT }}
