@@ -2,6 +2,10 @@
 
 Fast video clip cutter for gaming footage. Cut lossless (frame-accurate) for archiving, or squeeze clips under 10 MB for Discord.
 
+   <p align="center">
+     <img src="docs/screenshot.png" alt="RaskCut" width="600">
+   </p>
+
 ## Install
 
 Go to **[Releases](../../releases/latest)** and download `RaskCut-Setup-x.y.z.exe`. FFmpeg is included, nothing else to install.
