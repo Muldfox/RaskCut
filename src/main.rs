@@ -1,5 +1,3 @@
-// RaskCut, Rust port of the Python/Tkinter version.
-// Hide the console window on Windows release builds.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use eframe::egui::{

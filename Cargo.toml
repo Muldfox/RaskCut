@@ -1,10 +1,10 @@
 [package]
 name = "raskcut"
-version = "1.2.0"          # This is APP_VERSION. Bump it here for each release.
+version = "1.2.0"
 edition = "2021"
 
 [[bin]]
-name = "RaskCut"           # Produces RaskCut.exe
+name = "RaskCut"
 path = "src/main.rs"
 
 [dependencies]
