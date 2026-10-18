@@ -1,6 +1,6 @@
 # RaskCut
 
-Fast video clip cutter for gaming footage. Cut lossless (frame-accurate) for archiving, or squeeze clips under 10 MB for Discord.
+Fast video clip cutter for gaming footage, made in Rust. Cut lossless (frame-accurate) for archiving, or squeeze clips under 10 MB for Discord.
 
    <p align="center">
      <img src="docs/screenshot.png" alt="RaskCut" width="600">
