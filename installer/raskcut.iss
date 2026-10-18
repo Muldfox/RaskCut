@@ -20,6 +20,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\RaskCut.exe
 CloseApplications=yes
 WizardStyle=modern

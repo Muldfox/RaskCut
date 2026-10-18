@@ -1,3 +1,5 @@
+// RaskCut, Rust port of the Python/Tkinter version.
+// Hide the console window on Windows release builds.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use eframe::egui::{
@@ -1447,6 +1449,11 @@ impl RaskCut {
                         continue;
                     }
                     let duration = info.duration;
+                    // Show the loaded file in the window title.
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
+                        "RaskCut {APP_VERSION}  \u{b7}  {}",
+                        file_name(&path)
+                    )));
                     self.video = Some(Video { path, info });
                     self.trim_start = 0.0;
                     self.trim_end = duration;
@@ -2371,10 +2378,15 @@ fn main() -> eframe::Result {
             .with_inner_size([PW + PAD * 2.0, 620.0])
             .with_resizable(false)
             .with_maximize_button(false)
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png"))
+                    .expect("valid icon"),
+            ),
         ..Default::default()
     };
     eframe::run_native("RaskCut", options, Box::new(|cc| Ok(Box::new(RaskCut::new(cc)))))
 }
+
 
 
