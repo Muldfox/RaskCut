@@ -2,7 +2,7 @@
 
 **From game clip to Discord in seconds.**
 
-Your GPU already saves the moment. RaskCut turns it into a clip you can paste straight into Discord, small enough for a free account. No Nitro, no upload sites, no video editor to learn.
+Fast game clip cutter for Discord, written in Rust. Your GPU already saves the moment. RaskCut turns it into a clip you can paste straight into Discord, small enough for a free account. No Nitro, no upload sites, no video editor to learn.
 
 <p align="center">
   <img src="docs/screenshot.png" alt="RaskCut" width="600">
@@ -10,7 +10,7 @@ Your GPU already saves the moment. RaskCut turns it into a clip you can paste st
 
 ## Why RaskCut
 
-- **Fast.** Opens instantly, scrubs instantly, exports in seconds. Uses your GPU for encoding when it can (NVIDIA, AMD or Intel).
+- **Fast.** Written in Rust. Opens instantly, scrubs instantly, exports in seconds. Uses your GPU for encoding when it can (NVIDIA, AMD or Intel).
 - **Always fits Discord.** Discord mode squeezes every clip under 10 MB, the free upload limit, and picks the best resolution and frame rate for the length of the clip.
 - **Ready to paste.** The finished clip is copied to your clipboard. Open Discord, press Ctrl+V, done.
 - **Lossless when you want to keep it.** Lossless mode cuts on the exact frame and keeps the original quality and every audio track (game, mic, voice chat).
