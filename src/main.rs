@@ -23,24 +23,72 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION"); // from Cargo.toml
 const GITHUB_REPO: Option<&str> = option_env!("GITHUB_REPOSITORY");
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
-const BG: Color32 = Color32::from_rgb(0x1a, 0x1a, 0x1a);
-const BG2: Color32 = Color32::from_rgb(0x22, 0x22, 0x22);
-const BG3: Color32 = Color32::from_rgb(0x2c, 0x2c, 0x2c);
-const BORDER: Color32 = Color32::from_rgb(0x3a, 0x3a, 0x3a);
-const FG: Color32 = Color32::from_rgb(0xe8, 0xe8, 0xe8);
-const FG_DIM: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
-const ACCENT: Color32 = Color32::from_rgb(0x3a, 0x7b, 0xd5);
-const ACCENT_HOVER: Color32 = Color32::from_rgb(0x4a, 0x8b, 0xe5);
-const GREEN: Color32 = Color32::from_rgb(0x27, 0xae, 0x60);
-const RED: Color32 = Color32::from_rgb(0xff, 0x6b, 0x6b);
-const PREVIEW_BG: Color32 = Color32::from_rgb(0x0a, 0x0a, 0x0a);
+#[derive(Clone, Copy)]
+struct Pal {
+    bg: Color32,      // window
+    card: Color32,    // panels, dialogs
+    field: Color32,   // inputs, secondary buttons, tracks
+    hover: Color32,   // hovered secondary
+    border: Color32,
+    fg: Color32,
+    dim: Color32,
+    accent: Color32,
+    accent_hover: Color32,
+    accent_press: Color32,
+    green: Color32,
+    red: Color32,
+    preview: Color32,
+    handle: Color32,
+    raised: Color32, // selected segment
+}
+
+const DARK: Pal = Pal {
+    bg: Color32::from_rgb(0x16, 0x17, 0x19),
+    card: Color32::from_rgb(0x1e, 0x20, 0x23),
+    field: Color32::from_rgb(0x27, 0x29, 0x2d),
+    hover: Color32::from_rgb(0x31, 0x34, 0x39),
+    border: Color32::from_rgb(0x2e, 0x31, 0x36),
+    fg: Color32::from_rgb(0xec, 0xed, 0xef),
+    dim: Color32::from_rgb(0x8b, 0x90, 0x98),
+    accent: Color32::from_rgb(0x4a, 0x86, 0xe8),
+    accent_hover: Color32::from_rgb(0x5d, 0x94, 0xee),
+    accent_press: Color32::from_rgb(0x3d, 0x74, 0xd0),
+    green: Color32::from_rgb(0x3f, 0xb9, 0x78),
+    red: Color32::from_rgb(0xf0, 0x6f, 0x6f),
+    preview: Color32::from_rgb(0x0c, 0x0d, 0x0e),
+    handle: Color32::from_rgb(0xf4, 0xf5, 0xf6),
+    raised: Color32::from_rgb(0x3b, 0x3f, 0x46),
+};
+
+const LIGHT: Pal = Pal {
+    bg: Color32::from_rgb(0xf4, 0xf4, 0xf2),
+    card: Color32::from_rgb(0xff, 0xff, 0xff),
+    field: Color32::from_rgb(0xe9, 0xe9, 0xe6),
+    hover: Color32::from_rgb(0xdf, 0xdf, 0xdb),
+    border: Color32::from_rgb(0xdd, 0xdd, 0xd9),
+    fg: Color32::from_rgb(0x1d, 0x1e, 0x20),
+    dim: Color32::from_rgb(0x74, 0x77, 0x7c),
+    accent: Color32::from_rgb(0x3a, 0x76, 0xd8),
+    accent_hover: Color32::from_rgb(0x4a, 0x84, 0xe2),
+    accent_press: Color32::from_rgb(0x2f, 0x66, 0xc0),
+    green: Color32::from_rgb(0x2f, 0x9e, 0x63),
+    red: Color32::from_rgb(0xd6, 0x45, 0x45),
+    preview: Color32::from_rgb(0xe4, 0xe4, 0xe1),
+    handle: Color32::from_rgb(0xff, 0xff, 0xff),
+    raised: Color32::from_rgb(0xff, 0xff, 0xff),
+};
+
+static DARK_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+fn pal() -> Pal {
+    if DARK_MODE.load(std::sync::atomic::Ordering::Relaxed) { DARK } else { LIGHT }
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const SUPPORTED_FORMATS: [&str; 7] = ["mp4", "mov", "avi", "mkv", "wmv", "flv", "webm"];
 const THUMB_COUNT: usize = 40;
 const PREVIEW_W: usize = 580;
 const PREVIEW_H: usize = PREVIEW_W * 9 / 16;
-const TRIM_H: f32 = 20.0;
 const PAD: f32 = 12.0;
 const DECODE_TIMEOUT: Duration = Duration::from_secs(15);
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(600);
@@ -227,6 +275,7 @@ fn config_file() -> PathBuf {
 struct Settings {
     quality: Quality,
     clipboard: bool,
+    dark: bool,
 }
 
 fn load_settings() -> Settings {
@@ -237,11 +286,17 @@ fn load_settings() -> Settings {
     Settings {
         quality: v["quality"].as_str().map(Quality::from_name).unwrap_or(Quality::Discord),
         clipboard: v["clipboard"].as_bool().unwrap_or(true),
+        dark: v["theme"].as_str() != Some("light"),
     }
 }
 
 fn save_settings(s: &Settings) {
-    let json = serde_json::json!({ "quality": s.quality.name(), "clipboard": s.clipboard }).to_string();
+    let json = serde_json::json!({
+        "quality": s.quality.name(),
+        "clipboard": s.clipboard,
+        "theme": if s.dark { "dark" } else { "light" },
+    })
+    .to_string();
     if let Err(e) = std::fs::write(config_file(), json) {
         eprintln!("Could not save settings: {e}");
     }
@@ -1331,8 +1386,11 @@ struct RaskCut {
     active: Handle,
     last_trim_x: Option<f32>,
     queue: Vec<(f64, f64)>,
+    /// Index of the cut being edited live with the handles.
+    editing: Option<usize>,
 
     texture: Option<TextureHandle>,
+    logo: Option<TextureHandle>,
     cache: HashMap<usize, Arc<ColorImage>>,
     cache_order: VecDeque<usize>,
     decoding: bool,
@@ -1367,7 +1425,14 @@ impl Drop for RaskCut {
 
 impl RaskCut {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        setup_style(&cc.egui_ctx);
+        let settings = load_settings();
+        DARK_MODE.store(settings.dark, std::sync::atomic::Ordering::Relaxed);
+        setup_fonts(&cc.egui_ctx);
+        apply_visuals(&cc.egui_ctx);
+        let logo = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")).ok().map(|i| {
+            let img = ColorImage::from_rgba_unmultiplied([i.width as usize, i.height as usize], &i.rgba);
+            cc.egui_ctx.load_texture("logo", img, TextureOptions::LINEAR)
+        });
         let (tx, rx) = channel();
         let tx = Tx { tx, ctx: cc.egui_ctx.clone() };
 
@@ -1394,13 +1459,13 @@ impl RaskCut {
             });
         }
 
-        Self {
+        let mut app = Self {
             tx,
             rx,
             path_text: String::new(),
             start_text: String::new(),
             end_text: String::new(),
-            settings: load_settings(),
+            settings,
             video: None,
             gen: 0,
             trim_start: 0.0,
@@ -1409,7 +1474,9 @@ impl RaskCut {
             active: Handle::Start,
             last_trim_x: None,
             queue: Vec::new(),
+            editing: None,
             texture: None,
+            logo,
             cache: HashMap::new(),
             cache_order: VecDeque::new(),
             decoding: false,
@@ -1429,7 +1496,16 @@ impl RaskCut {
             clipboard: None,
             dialogs: VecDeque::new(),
             fitted_h: 0.0,
+        };
+        // "Open with RaskCut" / dropping a video on RaskCut.exe
+        if let Some(arg) = std::env::args_os().nth(1) {
+            let p = PathBuf::from(arg);
+            if p.is_file() {
+                app.path_text = p.display().to_string();
+                app.load_video(p);
+            }
         }
+        app
     }
 
     fn duration(&self) -> f64 {
@@ -1525,6 +1601,7 @@ impl RaskCut {
         self.decoding = false;
         self.pending = None;
         self.queue.clear();
+        self.editing = None;
         self.active = Handle::Start;
         self.stop_player();
         self.status = "Loading...".into();
@@ -1642,6 +1719,7 @@ impl RaskCut {
         self.active = Handle::Start;
         self.start_text = seconds_to_time(t);
         self.request_preview_at(t);
+        self.sync_editing();
     }
 
     fn trim_set_end(&mut self, t: f64) {
@@ -1650,6 +1728,16 @@ impl RaskCut {
         self.active = Handle::End;
         self.end_text = seconds_to_time(t);
         self.request_preview_at(t);
+        self.sync_editing();
+    }
+
+    /// While a cut is selected, the handles edit it directly.
+    fn sync_editing(&mut self) {
+        if let Some(i) = self.editing {
+            if let Some(c) = self.queue.get_mut(i) {
+                *c = (self.trim_start, self.trim_end);
+            }
+        }
     }
 
     fn nudge(&mut self, delta: f64) {
@@ -1689,7 +1777,7 @@ impl RaskCut {
         ctx.input_mut(|i| {
             i.events.retain(|e| match e {
                 egui::Event::Key { key, pressed, modifiers, .. }
-                    if matches!(key, Key::ArrowLeft | Key::ArrowRight | Key::Space) =>
+                    if matches!(key, Key::ArrowLeft | Key::ArrowRight | Key::Space | Key::Escape) =>
                 {
                     if *pressed {
                         actions.push((*key, modifiers.shift));
@@ -1705,7 +1793,8 @@ impl RaskCut {
             match key {
                 Key::ArrowLeft => self.nudge(-step),
                 Key::ArrowRight => self.nudge(step),
-                Key::Space => self.play(),
+                Key::Space => self.toggle_play(),
+                Key::Escape => self.finish_editing(),
                 _ => {}
             }
         }
@@ -1767,17 +1856,27 @@ impl RaskCut {
         }
     }
 
-    fn play(&mut self) {
-        self.play_segs(vec![(self.trim_start, self.trim_end)]);
+    /// What Play and Export work on: all cuts if there are any, otherwise the selection.
+    fn targets(&mut self) -> Vec<(f64, f64)> {
+        self.finish_editing();
+        if self.queue.is_empty() {
+            vec![(self.trim_start, self.trim_end)]
+        } else {
+            self.queue.clone()
+        }
     }
 
-    /// Adds the selection to the combined clip, kept in timeline order with
-    /// overlapping cuts merged.
-    fn add_cut(&mut self) {
-        if self.duration() <= 0.0 {
-            return;
+    fn toggle_play(&mut self) {
+        if self.player.is_some() {
+            self.stop_player();
+        } else {
+            let t = self.targets();
+            self.play_segs(t);
         }
-        self.queue.push((self.trim_start, self.trim_end));
+    }
+
+    /// Keeps cuts in timeline order and merges overlapping ones.
+    fn normalize_cuts(&mut self) {
         self.queue.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         let mut merged: Vec<(f64, f64)> = Vec::new();
         for (s, e) in self.queue.drain(..) {
@@ -1787,6 +1886,53 @@ impl RaskCut {
             }
         }
         self.queue = merged;
+    }
+
+    fn finish_editing(&mut self) {
+        if self.editing.take().is_some() {
+            self.normalize_cuts();
+        }
+    }
+
+    fn add_cut(&mut self) {
+        if self.duration() <= 0.0 {
+            return;
+        }
+        if self.editing.is_some() {
+            // The selection IS the cut being edited: confirm it and start fresh.
+            self.finish_editing();
+            return;
+        }
+        self.queue.push((self.trim_start, self.trim_end));
+        self.normalize_cuts();
+    }
+
+    fn select_cut(&mut self, i: usize) {
+        self.finish_editing();
+        let Some(&(s, e)) = self.queue.get(i) else { return };
+        self.trim_start = s;
+        self.trim_end = e;
+        self.sync_texts();
+        self.active = Handle::Start;
+        self.editing = Some(i);
+        self.request_preview_at(s);
+    }
+
+    fn remove_cut(&mut self, i: usize) {
+        self.editing = None;
+        if i < self.queue.len() {
+            self.queue.remove(i);
+        }
+        self.normalize_cuts();
+    }
+
+    fn export_main(&mut self) {
+        if self.video.is_none() {
+            self.dialog(DialogKind::Info, "Info", "Load a clip first.");
+            return;
+        }
+        let t = self.targets();
+        self.export(t);
     }
 
     fn export(&mut self, segments: Vec<(f64, f64)>) {
@@ -1817,6 +1963,13 @@ impl RaskCut {
         });
     }
 
+    fn toggle_theme(&mut self, ctx: &egui::Context) {
+        self.settings.dark = !self.settings.dark;
+        DARK_MODE.store(self.settings.dark, std::sync::atomic::Ordering::Relaxed);
+        apply_visuals(ctx);
+        save_settings(&self.settings);
+    }
+
     fn start_update(&mut self) {
         let Some(u) = self.update.clone() else { return };
         self.updating = true;
@@ -1830,17 +1983,25 @@ impl RaskCut {
 
     // ── UI pieces ───────────────────────────────────────────────────────────
     fn ui_top_bar(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
         ui.horizontal(|ui| {
-            ui.label(RichText::new("RaskCut").font(FontId::new(17.0, bold())).color(FG));
-            ui.label(RichText::new(APP_VERSION).size(11.0).color(FG_DIM));
+            ui.set_height(30.0);
+            if let Some(logo) = &self.logo {
+                ui.add(egui::Image::new((logo.id(), Vec2::splat(24.0))).corner_radius(CornerRadius::same(6)));
+            }
+            ui.add_space(2.0);
+            ui.label(RichText::new("RaskCut").font(FontId::new(17.0, bold())).color(p.fg));
+            ui.label(RichText::new(format!("v{APP_VERSION}")).size(11.5).color(p.dim));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let (ico, tip) = if self.settings.dark { (Ico::Sun, "Light mode") } else { (Ico::Moon, "Dark mode") };
+                if icon_button(ui, ico, 30.0, false).on_hover_text(tip).clicked() {
+                    let ctx = ui.ctx().clone();
+                    self.toggle_theme(&ctx);
+                }
                 if let Some(u) = self.update.clone() {
                     let verb = if is_installed() && u.installer_url.is_some() { "Update to" } else { "Download" };
                     let text = if self.updating { "Updating...".to_string() } else { format!("{verb} {}", u.version) };
-                    let btn = egui::Button::new(RichText::new(text).color(Color32::WHITE).size(12.0))
-                        .fill(GREEN)
-                        .corner_radius(CornerRadius::same(12));
-                    if ui.add_enabled(!self.updating, btn).clicked() {
+                    if pill(ui, &text, p.green, !self.updating).clicked() {
                         self.start_update();
                     }
                 }
@@ -1850,14 +2011,14 @@ impl RaskCut {
 
     fn ui_file_row(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            let browse_w = 84.0;
+            let browse_w = 92.0;
             let edit_w = ui.available_width() - browse_w - ui.spacing().item_spacing.x;
             let r = ui.add_sized(
-                [edit_w, 30.0],
+                [edit_w, 34.0],
                 egui::TextEdit::singleline(&mut self.path_text)
-                    .hint_text("Drop a video here or browse for one")
+                    .hint_text("Drop a video, or browse for one")
                     .vertical_align(Align::Center)
-                    .margin(Vec2::new(10.0, 6.0)),
+                    .margin(Vec2::new(12.0, 7.0)),
             );
             if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
                 let p = PathBuf::from(self.path_text.trim());
@@ -1865,22 +2026,34 @@ impl RaskCut {
                     self.load_video(p);
                 }
             }
-            if ui.add_sized([browse_w, 30.0], egui::Button::new("Browse")).clicked() {
+            if button(ui, "Browse", None, Vec2::new(browse_w, 34.0), Kind::Secondary, true).clicked() {
                 self.browse_file();
             }
         });
     }
 
     fn ui_preview(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(PW, PH), Sense::click_and_drag());
         let painter = ui.painter_at(rect);
-        let radius = CornerRadius::same(10);
-        painter.rect_filled(rect, radius, PREVIEW_BG);
+        let radius = CornerRadius::same(12);
+        painter.rect_filled(rect, radius, p.preview);
 
-        if let Some(tex) = &self.texture {
+        if let (Some(tex), true) = (&self.texture, self.video.is_some()) {
             egui::Image::new((tex.id(), rect.size())).corner_radius(radius).paint_at(ui, rect);
         } else {
-            painter.text(rect.center(), Align2::CENTER_CENTER, "Drop a video here", FontId::proportional(15.0), FG_DIM);
+            let c = rect.center();
+            painter.circle_filled(c - Vec2::new(0.0, 22.0), 26.0, p.field);
+            paint_icon(&painter, Ico::Plus, c - Vec2::new(0.0, 22.0), 20.0, p.dim, p.field);
+            painter.text(c + Vec2::new(0.0, 22.0), Align2::CENTER_CENTER, "Drop a video here", FontId::new(15.0, bold()), p.fg);
+            painter.text(c + Vec2::new(0.0, 44.0), Align2::CENTER_CENTER, "or click to browse", FontId::proportional(12.5), p.dim);
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+            }
+            if resp.clicked() {
+                self.browse_file();
+            }
+            return;
         }
 
         if self.duration() <= 0.0 {
@@ -1900,19 +2073,18 @@ impl RaskCut {
                     self.last_scrub_x = Some(x);
                     self.scrub_pending = Some((x, Instant::now() + SCRUB_DEBOUNCE));
                 }
-                // Time pill while scrubbing
                 let label = seconds_to_time(self.x_to_time(x));
                 let pill_pos = Pos2::new(
-                    (rect.left() + x).clamp(rect.left() + 34.0, rect.right() - 34.0),
-                    rect.top() + 18.0,
+                    (rect.left() + x).clamp(rect.left() + 36.0, rect.right() - 36.0),
+                    rect.top() + 20.0,
                 );
-                let galley = painter.layout_no_wrap(label, FontId::proportional(12.0), FG);
-                let pill = Rect::from_center_size(pill_pos, galley.size() + Vec2::new(14.0, 6.0));
-                painter.rect_filled(pill, CornerRadius::same(10), Color32::from_black_alpha(190));
-                painter.galley(pill.center() - galley.size() / 2.0, galley, FG);
+                let galley = painter.layout_no_wrap(label, FontId::proportional(12.0), Color32::WHITE);
+                let r = Rect::from_center_size(pill_pos, galley.size() + Vec2::new(16.0, 8.0));
+                painter.rect_filled(r, CornerRadius::same(10), Color32::from_black_alpha(170));
+                painter.galley(r.center() - galley.size() / 2.0, galley, Color32::WHITE);
                 painter.line_segment(
-                    [Pos2::new(rect.left() + x, pill.bottom()), Pos2::new(rect.left() + x, rect.bottom())],
-                    Stroke::new(1.0_f32, Color32::from_white_alpha(90)),
+                    [Pos2::new(rect.left() + x, r.bottom()), Pos2::new(rect.left() + x, rect.bottom())],
+                    Stroke::new(1.0_f32, Color32::from_white_alpha(110)),
                 );
             }
             if ui.input(|i| i.pointer.primary_released()) || !primary_down {
@@ -1936,11 +2108,12 @@ impl RaskCut {
     }
 
     fn ui_trim_bar(&mut self, ui: &mut egui::Ui) {
-        let (rect, resp) = ui.allocate_exact_size(Vec2::new(PW, TRIM_H), Sense::click_and_drag());
-        let painter = ui.painter_at(rect.expand(3.0));
+        let p = pal();
+        let (rect, resp) = ui.allocate_exact_size(Vec2::new(PW, 24.0), Sense::click_and_drag());
+        let painter = ui.painter_at(rect.expand(8.0));
         let mid = rect.center().y;
-        let track = Rect::from_min_max(Pos2::new(rect.left(), mid - 2.0), Pos2::new(rect.right(), mid + 2.0));
-        painter.rect_filled(track, CornerRadius::same(2), BORDER);
+        let track = Rect::from_min_max(Pos2::new(rect.left(), mid - 3.0), Pos2::new(rect.right(), mid + 3.0));
+        painter.rect_filled(track, CornerRadius::same(3), p.field);
 
         let d = self.duration();
         if d <= 0.0 {
@@ -1949,8 +2122,7 @@ impl RaskCut {
         let sx = (self.trim_start / d) as f32 * PW;
         let ex = (self.trim_end / d) as f32 * PW;
 
-        // Interaction
-        let pointer_x = ui.input(|i| i.pointer.latest_pos()).map(|p| (p.x - rect.left()).clamp(0.0, PW));
+        let pointer_x = ui.input(|i| i.pointer.latest_pos()).map(|q| (q.x - rect.left()).clamp(0.0, PW));
         let primary_down = ui.input(|i| i.pointer.primary_down());
         if self.trim_drag.is_none() && resp.is_pointer_button_down_on() && primary_down {
             if let Some(x) = pointer_x {
@@ -1979,48 +2151,49 @@ impl RaskCut {
                 }
             }
         }
-
-        let near = |hx: f32| resp.hovered() && pointer_x.is_some_and(|x| (x - hx).abs() <= 8.0);
+        let near = |hx: f32| resp.hovered() && pointer_x.is_some_and(|x| (x - hx).abs() <= 9.0);
         if self.trim_drag.is_some() || near(sx) || near(ex) {
             ui.ctx().set_cursor_icon(CursorIcon::ResizeHorizontal);
         }
 
-        // Queued segments
-        for &(qs, qe) in &self.queue {
-            let r = Rect::from_min_max(
-                Pos2::new(rect.left() + (qs / d) as f32 * PW, mid - 2.0),
-                Pos2::new(rect.left() + (qe / d) as f32 * PW, mid + 2.0),
-            );
-            painter.rect_filled(r, CornerRadius::same(2), GREEN.gamma_multiply(0.6));
+        let to_x = |t: f64| rect.left() + (t / d) as f32 * PW;
+        for (i, &(qs, qe)) in self.queue.iter().enumerate() {
+            if self.editing == Some(i) {
+                continue;
+            }
+            let r = Rect::from_min_max(Pos2::new(to_x(qs), mid - 3.0), Pos2::new(to_x(qe), mid + 3.0));
+            painter.rect_filled(r, CornerRadius::same(3), p.accent.gamma_multiply(0.35));
         }
-
-        // Selection + handles (active handle is highlighted)
-        let sx = rect.left() + (self.trim_start / d) as f32 * PW;
-        let ex = rect.left() + (self.trim_end / d) as f32 * PW;
-        let sel = Rect::from_min_max(Pos2::new(sx, mid - 2.0), Pos2::new(ex, mid + 2.0));
-        painter.rect_filled(sel, CornerRadius::same(2), ACCENT);
+        let (sx, ex) = (to_x(self.trim_start), to_x(self.trim_end));
+        let sel = Rect::from_min_max(Pos2::new(sx, mid - 3.0), Pos2::new(ex, mid + 3.0));
+        painter.rect_filled(sel, CornerRadius::same(3), p.accent);
         for (hx, which) in [(sx, Handle::Start), (ex, Handle::End)] {
             let active = self.active == which;
-            let w = if self.trim_drag == Some(which) { 8.0 } else { 6.0 };
-            let r = Rect::from_center_size(Pos2::new(hx, mid), Vec2::new(w, TRIM_H - 2.0));
-            painter.rect_filled(r, CornerRadius::same(3), if active { Color32::WHITE } else { FG_DIM });
+            let r = Rect::from_center_size(Pos2::new(hx, mid), Vec2::new(10.0, 22.0));
+            painter.rect_filled(r.translate(Vec2::new(0.0, 1.0)), CornerRadius::same(5), Color32::from_black_alpha(50));
+            painter.rect_filled(r, CornerRadius::same(5), p.handle);
             if active {
-                painter.rect_stroke(r.expand(1.5), CornerRadius::same(4), Stroke::new(1.5_f32, ACCENT), egui::StrokeKind::Outside);
+                painter.rect_stroke(r, CornerRadius::same(5), Stroke::new(2.0_f32, p.accent), egui::StrokeKind::Inside);
+            } else {
+                painter.rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0_f32, p.border), egui::StrokeKind::Inside);
             }
         }
     }
 
     fn ui_controls(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
         ui.horizontal(|ui| {
+            ui.set_height(32.0);
             let entry = |ui: &mut egui::Ui, text: &mut String| {
-                ui.add(
+                ui.add_sized(
+                    [92.0, 32.0],
                     egui::TextEdit::singleline(text)
-                        .desired_width(86.0)
                         .horizontal_align(Align::Center)
+                        .vertical_align(Align::Center)
                         .margin(Vec2::new(6.0, 6.0)),
                 )
             };
-            ui.label(RichText::new("Start").color(FG_DIM));
+            ui.label(RichText::new("Start").size(12.5).color(p.dim));
             let r = entry(ui, &mut self.start_text);
             if r.gained_focus() {
                 self.active = Handle::Start;
@@ -2028,8 +2201,8 @@ impl RaskCut {
             if r.lost_focus() {
                 self.on_start_entry_change();
             }
-            ui.add_space(8.0);
-            ui.label(RichText::new("End").color(FG_DIM));
+            ui.add_space(4.0);
+            ui.label(RichText::new("End").size(12.5).color(p.dim));
             let r = entry(ui, &mut self.end_text);
             if r.gained_focus() {
                 self.active = Handle::End;
@@ -2037,133 +2210,149 @@ impl RaskCut {
             if r.lost_focus() {
                 self.on_end_entry_change();
             }
-
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                egui::ComboBox::from_id_salt("quality")
-                    .selected_text(self.settings.quality.name())
-                    .width(100.0)
-                    .show_ui(ui, |ui| {
-                        for q in Quality::ALL {
-                            ui.selectable_value(&mut self.settings.quality, q, q.name());
-                        }
-                    });
-                ui.label(RichText::new("Quality").color(FG_DIM));
+                let cur = if self.settings.quality == Quality::Discord { 0 } else { 1 };
+                if let Some(i) = segmented(ui, &["Discord", "Lossless"], cur, 200.0) {
+                    self.settings.quality = Quality::ALL[i];
+                    save_settings(&self.settings);
+                }
             });
         });
     }
 
     fn ui_actions(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
         let loaded = self.duration() > 0.0;
         ui.horizontal(|ui| {
-            let sel = (self.trim_end - self.trim_start).max(0.0);
-            let hint = if loaded {
-                format!("Selection {}    \u{2190}/\u{2192} frame, Shift 1 s, Space play", seconds_to_time(sel))
+            ui.set_height(30.0);
+            let text = if loaded {
+                format!(
+                    "Selection {}   \u{b7}   Arrows: frame, Shift: 1 s, Space: play",
+                    seconds_to_time((self.trim_end - self.trim_start).max(0.0))
+                )
             } else {
                 "Left click sets start, right click sets end".to_string()
             };
-            ui.label(RichText::new(hint).size(11.5).color(FG_DIM));
+            match self.editing {
+                Some(i) => ui.label(
+                    RichText::new(format!("Editing cut {}   \u{b7}   Esc or Add cut when done", i + 1))
+                        .size(11.5)
+                        .color(p.accent),
+                ),
+                None => ui.label(RichText::new(text).size(11.5).color(p.dim)),
+            };
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui
-                    .add_enabled(loaded, egui::Button::new("Add cut"))
-                    .on_hover_text("Add this selection to the combined clip")
+                if button(ui, "Add cut", Some(Ico::Plus), Vec2::new(104.0, 30.0), Kind::Secondary, loaded)
+                    .on_hover_text("Add the selection as a cut. All cuts are played and exported as one video.")
                     .clicked()
                 {
                     self.add_cut();
-                }
-                let playing = self.player.is_some();
-                let label = if playing { "Stop" } else { "Play" };
-                if ui
-                    .add_enabled(loaded, egui::Button::new(label))
-                    .on_hover_text("Preview the current selection")
-                    .clicked()
-                {
-                    if playing { self.stop_player() } else { self.play() }
                 }
             });
         });
     }
 
-    fn ui_queue(&mut self, ui: &mut egui::Ui) {
+    fn ui_cuts(&mut self, ui: &mut egui::Ui) {
         if self.queue.is_empty() {
             return;
         }
-        let mut remove = None;
-        let mut select = None;
-        let mut play_all = false;
+        let p = pal();
+        let mut action: Option<(char, usize)> = None;
+        let mut clear = false;
         let total: f64 = self.queue.iter().map(|(s, e)| e - s).sum();
         egui::Frame::NONE
-            .fill(BG2)
-            .stroke(Stroke::new(1.0_f32, BORDER))
-            .corner_radius(CornerRadius::same(8))
-            .inner_margin(Vec2::new(10.0, 8.0))
+            .fill(p.card)
+            .stroke(Stroke::new(1.0_f32, p.border))
+            .corner_radius(CornerRadius::same(12))
+            .inner_margin(egui::Margin::symmetric(10, 8))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
+                ui.spacing_mut().item_spacing.y = 2.0;
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Combined clip").color(FG).size(12.5));
+                    ui.add_space(4.0);
+                    ui.label(RichText::new("Cuts").font(FontId::new(13.0, bold())).color(p.fg));
                     let n = self.queue.len();
-                    let cuts = if n == 1 { "1 cut".to_string() } else { format!("{n} cuts") };
-                    ui.label(RichText::new(format!("{cuts}  \u{b7}  {}", seconds_to_time(total))).color(FG_DIM).size(12.0));
+                    ui.label(RichText::new(format!("{n}  \u{b7}  {}", seconds_to_time(total))).size(12.0).color(p.dim));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(egui::Button::new(RichText::new("Clear").size(12.0)).frame(false)).clicked() {
-                            self.queue.clear();
-                        }
-                        if ui
-                            .add(egui::Button::new(RichText::new("Play all").size(12.0)))
-                            .on_hover_text("Preview the final combined video")
-                            .clicked()
-                        {
-                            play_all = true;
+                        if button(ui, "Clear", None, Vec2::new(56.0, 24.0), Kind::Ghost, true).clicked() {
+                            clear = true;
                         }
                     });
                 });
-                egui::ScrollArea::vertical().max_height(120.0).show(ui, |ui| {
+                ui.add_space(4.0);
+                egui::ScrollArea::vertical().max_height(132.0).show(ui, |ui| {
+                    let w = ui.available_width();
                     for (i, &(s, e)) in self.queue.iter().enumerate() {
-                        ui.horizontal(|ui| {
-                            let text = format!(
-                                "{}.   {}  \u{2192}  {}     {:.1} s",
-                                i + 1,
-                                seconds_to_time(s),
-                                seconds_to_time(e),
-                                e - s
-                            );
-                            if ui
-                                .add(egui::Label::new(RichText::new(text).size(12.5)).sense(Sense::click()))
-                                .on_hover_text("Click to load this cut into the handles")
-                                .clicked()
-                            {
-                                select = Some((s, e));
-                            }
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.add(egui::Button::new(RichText::new("\u{d7}").size(14.0)).frame(false)).clicked() {
-                                    remove = Some(i);
-                                }
-                            });
-                        });
+                        let (row, row_resp) = ui.allocate_exact_size(Vec2::new(w, 30.0), Sense::click());
+                        let cy = row.center().y;
+                        let play_r = Rect::from_center_size(Pos2::new(row.left() + 16.0, cy), Vec2::splat(26.0));
+                        let del_r = Rect::from_center_size(Pos2::new(row.right() - 16.0, cy), Vec2::splat(26.0));
+                        let play_resp = ui.interact(play_r, ui.id().with(("play", i)), Sense::click());
+                        let del_resp = ui.interact(del_r, ui.id().with(("del", i)), Sense::click());
+                        let painter = ui.painter();
+                        let editing = self.editing == Some(i);
+                        if editing {
+                            painter.rect_filled(row, CornerRadius::same(8), p.accent.gamma_multiply(0.18));
+                        } else if row_resp.hovered() || play_resp.hovered() || del_resp.hovered() {
+                            painter.rect_filled(row, CornerRadius::same(8), p.field);
+                        }
+                        if play_resp.hovered() {
+                            painter.circle_filled(play_r.center(), 12.0, p.hover);
+                        }
+                        paint_icon(painter, Ico::Play, play_r.center(), 11.0, if play_resp.hovered() { p.accent } else { p.fg }, p.card);
+                        if del_resp.hovered() {
+                            painter.circle_filled(del_r.center(), 12.0, p.hover);
+                        }
+                        paint_icon(painter, Ico::Close, del_r.center(), 10.0, if del_resp.hovered() { p.red } else { p.dim }, p.card);
+                        painter.text(Pos2::new(row.left() + 38.0, cy), Align2::LEFT_CENTER, format!("{}", i + 1), FontId::proportional(12.5), p.dim);
+                        let tcol = if editing { p.accent } else { p.fg };
+                        let r1 = painter.text(Pos2::new(row.left() + 58.0, cy), Align2::LEFT_CENTER, seconds_to_time(s), FontId::proportional(13.0), tcol);
+                        let ax = r1.right() + 10.0;
+                        let astroke = Stroke::new(1.3_f32, p.dim);
+                        painter.line_segment([Pos2::new(ax, cy), Pos2::new(ax + 12.0, cy)], astroke);
+                        painter.line_segment([Pos2::new(ax + 8.0, cy - 3.5), Pos2::new(ax + 12.0, cy)], astroke);
+                        painter.line_segment([Pos2::new(ax + 8.0, cy + 3.5), Pos2::new(ax + 12.0, cy)], astroke);
+                        painter.text(Pos2::new(ax + 22.0, cy), Align2::LEFT_CENTER, seconds_to_time(e), FontId::proportional(13.0), tcol);
+                        painter.text(Pos2::new(row.right() - 40.0, cy), Align2::RIGHT_CENTER, format!("{:.1} s", e - s), FontId::proportional(12.5), p.dim);
+                        if play_resp.hovered() || del_resp.hovered() || row_resp.hovered() {
+                            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                        }
+                        if play_resp.clicked() {
+                            action = Some(('p', i));
+                        } else if del_resp.clicked() {
+                            action = Some(('x', i));
+                        } else if row_resp.clicked() {
+                            action = Some(('e', i));
+                        }
+                        play_resp.on_hover_text("Play this cut");
+                        row_resp.on_hover_text("Click to edit this cut with the handles. Click again or press Esc when done.");
                     }
                 });
             });
-        if let Some(i) = remove {
-            if i < self.queue.len() {
-                self.queue.remove(i);
+        if clear {
+            self.editing = None;
+            self.queue.clear();
+        }
+        match action {
+            Some(('p', i)) => {
+                if let Some(&seg) = self.queue.get(i) {
+                    self.play_segs(vec![seg]);
+                }
             }
-        }
-        if let Some((s, e)) = select {
-            self.trim_start = s;
-            self.trim_end = e;
-            self.sync_texts();
-            self.active = Handle::Start;
-            self.request_preview_at(s);
-        }
-        if play_all {
-            self.play_segs(self.queue.clone());
+            Some(('x', i)) => self.remove_cut(i),
+            Some(('e', i)) => {
+                if self.editing == Some(i) { self.finish_editing() } else { self.select_cut(i) }
+            }
+            _ => {}
         }
     }
 
     fn ui_progress(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
         let (rect, _) = ui.allocate_exact_size(Vec2::new(PW, 4.0), Sense::hover());
         let painter = ui.painter_at(rect);
         let r = CornerRadius::same(2);
-        painter.rect_filled(rect, r, BG3);
+        painter.rect_filled(rect, r, p.field);
         if self.indeterminate {
             let t = ui.input(|i| i.time) as f32;
             let seg = PW * 0.25;
@@ -2172,53 +2361,59 @@ impl RaskCut {
                 Pos2::new(rect.left() + x.max(0.0), rect.top()),
                 Pos2::new((rect.left() + x + seg).min(rect.right()), rect.bottom()),
             );
-            painter.rect_filled(bar, r, ACCENT);
+            painter.rect_filled(bar, r, p.accent);
             ui.ctx().request_repaint();
         } else if self.progress > 0.0 {
             let mut bar = rect;
             bar.set_width(PW * self.progress / 100.0);
-            painter.rect_filled(bar, r, ACCENT);
+            painter.rect_filled(bar, r, p.accent);
         }
     }
 
     fn ui_buttons(&mut self, ui: &mut egui::Ui) {
+        let p = pal();
+        let loaded = self.duration() > 0.0;
+        let n = self.queue.len();
         ui.horizontal(|ui| {
             let gap = ui.spacing().item_spacing.x;
-            let w = (ui.available_width() - gap * 2.0) / 3.0;
+            let folder_w = 44.0;
+            let play_w = 150.0;
+            let export_w = ui.available_width() - folder_w - play_w - gap * 2.0;
+            let h = 42.0;
 
-            let export_text = if self.exporting { "Exporting..." } else { "Export Clip" };
-            let export_btn = egui::Button::new(
-                RichText::new(export_text).font(FontId::new(14.0, bold())).color(Color32::WHITE),
-            )
-            .fill(if self.exporting { ACCENT.gamma_multiply(0.5) } else { ACCENT })
-            .corner_radius(CornerRadius::same(8));
-            let r = ui.add_sized([w, 38.0], export_btn);
-            if r.hovered() && !self.exporting {
-                ui.painter().rect_filled(r.rect, CornerRadius::same(8), ACCENT_HOVER.gamma_multiply(0.15));
+            let playing = self.player.is_some();
+            let (plabel, pico) = if playing { ("Stop", Ico::Stop) } else { ("Play", Ico::Play) };
+            if button(ui, plabel, Some(pico), Vec2::new(play_w, h), Kind::Secondary, loaded)
+                .on_hover_text(if n > 0 { "Play all cuts back to back (Space)" } else { "Play the selection (Space)" })
+                .clicked()
+            {
+                self.toggle_play();
+            }
+
+            let elabel = if self.exporting { "Exporting..." } else { "Export" };
+            if button(ui, elabel, None, Vec2::new(export_w, h), Kind::Primary, loaded && !self.exporting)
+                .on_hover_text(if n > 0 { "Export all cuts as one video" } else { "Export the selection" })
+                .clicked()
+            {
+                self.export_main();
+            }
+
+            let (r, resp) = ui.allocate_exact_size(Vec2::new(folder_w, h), Sense::click());
+            let fill = if resp.hovered() { p.hover } else { p.field };
+            ui.painter().rect_filled(r, CornerRadius::same(10), fill);
+            paint_icon(ui.painter(), Ico::Folder, r.center(), 18.0, p.fg, fill);
+            if resp.hovered() {
                 ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
             }
-            if r.clicked() {
-                if self.video.is_none() {
-                    self.dialog(DialogKind::Info, "Info", "Load a clip first.");
-                } else {
-                    self.export(vec![(self.trim_start, self.trim_end)]);
-                }
-            }
-
-            let q = self.queue.len();
-            let queue_btn = egui::Button::new(RichText::new(format!("Export Combined ({q})")).size(14.0))
-                .corner_radius(CornerRadius::same(8));
-            if ui.add_enabled_ui(q > 0 && !self.exporting, |ui| ui.add_sized([w, 38.0], queue_btn)).inner.clicked() {
-                self.export(self.queue.clone());
-            }
-
-            let folder_btn = egui::Button::new(RichText::new("Open Folder").size(14.0)).corner_radius(CornerRadius::same(8));
-            if ui.add_sized([w, 38.0], folder_btn).clicked() {
+            if resp.on_hover_text("Open the clips folder").clicked() {
                 self.open_folder();
             }
         });
         ui.horizontal(|ui| {
-            if ui.checkbox(&mut self.settings.clipboard, RichText::new("Copy clips to clipboard after export").size(12.0).color(FG_DIM)).changed() {
+            if ui
+                .checkbox(&mut self.settings.clipboard, RichText::new("Copy to clipboard after export").size(12.0).color(p.dim))
+                .changed()
+            {
                 save_settings(&self.settings);
             }
         });
@@ -2226,26 +2421,25 @@ impl RaskCut {
 
     fn ui_dialog(&mut self, ctx: &egui::Context) {
         let Some(d) = self.dialogs.front() else { return };
+        let p = pal();
         let (title, body, kind) = (d.title.clone(), d.body.clone(), d.kind);
         let mut close = false;
-        let modal = egui::Modal::new(egui::Id::new("fastcut_dialog")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::new("raskcut_dialog")).show(ctx, |ui| {
             ui.set_width(380.0);
             let color = match kind {
-                DialogKind::Info => FG,
-                DialogKind::Error => RED,
+                DialogKind::Info => p.fg,
+                DialogKind::Error => p.red,
             };
             ui.label(RichText::new(title).font(FontId::new(16.0, bold())).color(color));
             ui.add_space(6.0);
             egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                ui.label(RichText::new(body).color(FG));
+                ui.label(RichText::new(body).color(p.fg));
             });
-            ui.add_space(10.0);
+            ui.add_space(12.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let ok = egui::Button::new(RichText::new("OK").color(Color32::WHITE))
-                    .fill(ACCENT)
-                    .min_size(Vec2::new(80.0, 30.0))
-                    .corner_radius(CornerRadius::same(6));
-                if ui.add(ok).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                if button(ui, "OK", None, Vec2::new(88.0, 34.0), Kind::Primary, true).clicked()
+                    || ui.input(|i| i.key_pressed(Key::Enter))
+                {
                     close = true;
                 }
             });
@@ -2259,11 +2453,12 @@ impl RaskCut {
         if !ctx.input(|i| !i.raw.hovered_files.is_empty()) {
             return;
         }
+        let p = pal();
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("drop")));
         let screen = ctx.content_rect();
-        painter.rect_filled(screen, CornerRadius::ZERO, Color32::from_black_alpha(170));
-        painter.rect_stroke(screen.shrink(10.0), CornerRadius::same(12), Stroke::new(2.0_f32, ACCENT), egui::StrokeKind::Inside);
-        painter.text(screen.center(), Align2::CENTER_CENTER, "Drop to load", FontId::proportional(20.0), FG);
+        painter.rect_filled(screen, CornerRadius::ZERO, p.bg.gamma_multiply(0.92));
+        painter.rect_stroke(screen.shrink(12.0), CornerRadius::same(16), Stroke::new(2.0_f32, p.accent), egui::StrokeKind::Inside);
+        painter.text(screen.center(), Align2::CENTER_CENTER, "Drop to load", FontId::new(20.0, bold()), p.fg);
     }
 }
 
@@ -2280,32 +2475,30 @@ impl eframe::App for RaskCut {
         self.run_timers(ctx);
 
         let panel = egui::CentralPanel::default()
-            .frame(egui::Frame::NONE.fill(BG).inner_margin(PAD))
+            .frame(egui::Frame::NONE.fill(pal().bg).inner_margin(PAD + 4.0))
             .show(ctx, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 10.0);
                 self.ui_top_bar(ui);
                 self.ui_file_row(ui);
                 self.ui_preview(ui);
-                ui.add_space(2.0);
                 self.ui_trim_bar(ui);
-                ui.add_space(2.0);
                 self.ui_controls(ui);
                 self.ui_actions(ui);
-                self.ui_queue(ui);
+                self.ui_cuts(ui);
                 ui.add_space(2.0);
                 self.ui_progress(ui);
                 ui.vertical_centered(|ui| {
-                    ui.label(RichText::new(&self.status).size(12.0).color(FG_DIM));
+                    ui.label(RichText::new(&self.status).size(12.0).color(pal().dim));
                 });
                 self.ui_buttons(ui);
                 ui.min_rect().bottom()
             });
 
         // Fit the window height to the content.
-        let wanted = (panel.inner + PAD).ceil();
+        let wanted = (panel.inner + PAD + 4.0).ceil();
         if (wanted - self.fitted_h).abs() > 1.0 {
             self.fitted_h = wanted;
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(PW + PAD * 2.0, wanted)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(PW + (PAD + 4.0) * 2.0, wanted)));
         }
 
         self.ui_drop_overlay(ctx);
@@ -2313,13 +2506,171 @@ impl eframe::App for RaskCut {
     }
 }
 
+// ─── Widgets ────────────────────────────────────────────────────────────────
+#[derive(Clone, Copy, PartialEq)]
+enum Ico {
+    Play,
+    Stop,
+    Plus,
+    Close,
+    Folder,
+    Sun,
+    Moon,
+}
+
+/// Small vector icons, drawn so they look crisp at any size and in both themes.
+/// `bg` is the color behind the icon (used to cut out the moon).
+fn paint_icon(p: &egui::Painter, ico: Ico, c: Pos2, s: f32, col: Color32, bg: Color32) {
+    let line = Stroke::new((s * 0.12).max(1.4), col);
+    match ico {
+        Ico::Play => {
+            let pts = vec![
+                Pos2::new(c.x - s * 0.32, c.y - s * 0.42),
+                Pos2::new(c.x - s * 0.32, c.y + s * 0.42),
+                Pos2::new(c.x + s * 0.42, c.y),
+            ];
+            p.add(egui::Shape::convex_polygon(pts, col, Stroke::NONE));
+        }
+        Ico::Stop => {
+            p.rect_filled(Rect::from_center_size(c, Vec2::splat(s * 0.7)), CornerRadius::same(2), col);
+        }
+        Ico::Plus => {
+            let h = s * 0.4;
+            p.line_segment([Pos2::new(c.x - h, c.y), Pos2::new(c.x + h, c.y)], line);
+            p.line_segment([Pos2::new(c.x, c.y - h), Pos2::new(c.x, c.y + h)], line);
+        }
+        Ico::Close => {
+            let h = s * 0.32;
+            p.line_segment([Pos2::new(c.x - h, c.y - h), Pos2::new(c.x + h, c.y + h)], line);
+            p.line_segment([Pos2::new(c.x - h, c.y + h), Pos2::new(c.x + h, c.y - h)], line);
+        }
+        Ico::Folder => {
+            let body = Rect::from_min_max(Pos2::new(c.x - s * 0.5, c.y - s * 0.26), Pos2::new(c.x + s * 0.5, c.y + s * 0.4));
+            let tab = Rect::from_min_max(Pos2::new(c.x - s * 0.5, c.y - s * 0.4), Pos2::new(c.x - s * 0.05, c.y - s * 0.2));
+            p.rect_filled(tab, CornerRadius::same(2), col);
+            p.rect_stroke(body, CornerRadius::same(3), Stroke::new((s * 0.1).max(1.4), col), egui::StrokeKind::Inside);
+        }
+        Ico::Sun => {
+            p.circle_filled(c, s * 0.2, col);
+            for k in 0..8 {
+                let a = k as f32 * std::f32::consts::TAU / 8.0;
+                let dir = Vec2::new(a.cos(), a.sin());
+                p.line_segment([c + dir * s * 0.33, c + dir * s * 0.46], Stroke::new((s * 0.09).max(1.3), col));
+            }
+        }
+        Ico::Moon => {
+            p.circle_filled(c, s * 0.38, col);
+            p.circle_filled(c + Vec2::new(s * 0.2, -s * 0.16), s * 0.32, bg);
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Kind {
+    Primary,
+    Secondary,
+    Ghost,
+}
+
+fn button(ui: &mut egui::Ui, label: &str, icon: Option<Ico>, size: Vec2, kind: Kind, enabled: bool) -> egui::Response {
+    let p = pal();
+    let (rect, resp) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    let hovered = enabled && resp.hovered();
+    let pressed = enabled && resp.is_pointer_button_down_on();
+    let (fill, text, font) = match kind {
+        Kind::Primary => (
+            if !enabled { p.accent.gamma_multiply(0.45) } else if pressed { p.accent_press } else if hovered { p.accent_hover } else { p.accent },
+            Color32::WHITE,
+            FontId::new(14.0, bold()),
+        ),
+        Kind::Secondary => (
+            if hovered { p.hover } else { p.field },
+            if enabled { p.fg } else { p.dim },
+            FontId::proportional(13.5),
+        ),
+        Kind::Ghost => (
+            if hovered { p.field } else { Color32::TRANSPARENT },
+            if enabled { p.dim } else { p.border },
+            FontId::proportional(12.5),
+        ),
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, CornerRadius::same(10), fill);
+    let galley = painter.layout_no_wrap(label.to_string(), font, text);
+    let icon_w = if icon.is_some() { 20.0 } else { 0.0 };
+    let total = icon_w + galley.size().x;
+    let x0 = rect.center().x - total / 2.0;
+    if let Some(ico) = icon {
+        paint_icon(painter, ico, Pos2::new(x0 + 6.0, rect.center().y), 12.0, text, fill);
+    }
+    painter.galley(Pos2::new(x0 + icon_w, rect.center().y - galley.size().y / 2.0), galley, text);
+    if hovered {
+        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+    }
+    resp
+}
+
+fn icon_button(ui: &mut egui::Ui, ico: Ico, size: f32, filled: bool) -> egui::Response {
+    let p = pal();
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
+    let fill = if resp.hovered() { p.hover } else if filled { p.field } else { p.bg };
+    ui.painter().rect_filled(rect, CornerRadius::same((size / 2.0) as u8), fill);
+    paint_icon(ui.painter(), ico, rect.center(), size * 0.55, p.fg, fill);
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+    }
+    resp
+}
+
+fn pill(ui: &mut egui::Ui, text: &str, color: Color32, enabled: bool) -> egui::Response {
+    let galley = ui.painter().layout_no_wrap(text.to_string(), FontId::new(12.0, bold()), Color32::WHITE);
+    let size = galley.size() + Vec2::new(22.0, 10.0);
+    let (rect, resp) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    let fill = if enabled && resp.hovered() { color.gamma_multiply(1.15) } else { color };
+    ui.painter().rect_filled(rect, CornerRadius::same(255), fill);
+    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, Color32::WHITE);
+    if enabled && resp.hovered() {
+        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+    }
+    resp
+}
+
+/// Two or more options in one rounded control. Returns the clicked index.
+fn segmented(ui: &mut egui::Ui, options: &[&str], selected: usize, width: f32) -> Option<usize> {
+    let p = pal();
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 32.0), Sense::hover());
+    ui.painter().rect_filled(rect, CornerRadius::same(10), p.field);
+    let w = width / options.len() as f32;
+    let mut clicked = None;
+    for (i, opt) in options.iter().enumerate() {
+        let r = Rect::from_min_size(Pos2::new(rect.left() + w * i as f32, rect.top()), Vec2::new(w, 32.0));
+        let resp = ui.interact(r, ui.id().with(("seg", i, *opt)), Sense::click());
+        let inner = r.shrink(3.0);
+        if i == selected {
+            ui.painter().rect_filled(inner.translate(Vec2::new(0.0, 1.0)), CornerRadius::same(8), Color32::from_black_alpha(30));
+            ui.painter().rect_filled(inner, CornerRadius::same(8), p.raised);
+        } else if resp.hovered() {
+            ui.painter().rect_filled(inner, CornerRadius::same(8), p.hover);
+        }
+        let (font, col) = if i == selected { (FontId::new(13.0, bold()), p.fg) } else { (FontId::proportional(13.0), p.dim) };
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, *opt, font, col);
+        if resp.hovered() && i != selected {
+            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        }
+        if resp.clicked() && i != selected {
+            clicked = Some(i);
+        }
+    }
+    clicked
+}
+
 // ─── Look & feel ────────────────────────────────────────────────────────────
 fn bold() -> FontFamily {
     FontFamily::Name("bold".into())
 }
 
-fn setup_style(ctx: &egui::Context) {
-    // Use Segoe UI on Windows when available.
+fn setup_fonts(ctx: &egui::Context) {
+    // Segoe UI on Windows when available.
     let mut fonts = egui::FontDefinitions::default();
     let mut bold_family = fonts.families[&FontFamily::Proportional].clone();
     if cfg!(windows) {
@@ -2336,36 +2687,47 @@ fn setup_style(ctx: &egui::Context) {
     }
     fonts.families.insert(bold(), bold_family);
     ctx.set_fonts(fonts);
+}
 
-    let mut v = egui::Visuals::dark();
-    v.panel_fill = BG;
-    v.window_fill = BG2;
-    v.window_stroke = Stroke::new(1.0_f32, BORDER);
-    v.window_corner_radius = CornerRadius::same(10);
-    v.extreme_bg_color = BG3; // text field background
-    v.selection.bg_fill = ACCENT.gamma_multiply(0.6);
-    v.selection.stroke = Stroke::new(1.0_f32, ACCENT);
-    v.override_text_color = Some(FG);
+/// Applies the current palette (dark or light) to egui's built-in widgets.
+fn apply_visuals(ctx: &egui::Context) {
+    let p = pal();
+    let dark = DARK_MODE.load(std::sync::atomic::Ordering::Relaxed);
+    let mut v = if dark { egui::Visuals::dark() } else { egui::Visuals::light() };
+    v.panel_fill = p.bg;
+    v.window_fill = p.card;
+    v.window_stroke = Stroke::new(1.0_f32, p.border);
+    v.window_corner_radius = CornerRadius::same(14);
+    v.window_shadow = egui::Shadow { offset: [0, 8], blur: 28, spread: 0, color: Color32::from_black_alpha(if dark { 110 } else { 40 }) };
+    v.popup_shadow = v.window_shadow;
+    v.extreme_bg_color = p.field; // text fields
+    v.selection.bg_fill = p.accent.gamma_multiply(0.45);
+    v.selection.stroke = Stroke::new(1.5_f32, p.accent);
+    v.override_text_color = Some(p.fg);
+    v.hyperlink_color = p.accent;
 
-    let r = CornerRadius::same(6);
-    v.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, BORDER);
-    v.widgets.inactive.weak_bg_fill = BG3;
-    v.widgets.inactive.bg_fill = BG3;
-    v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, BORDER);
-    v.widgets.inactive.corner_radius = r;
-    v.widgets.hovered.weak_bg_fill = BORDER;
-    v.widgets.hovered.bg_fill = BORDER;
-    v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgb(0x50, 0x50, 0x50));
-    v.widgets.hovered.corner_radius = r;
-    v.widgets.active.weak_bg_fill = Color32::from_rgb(0x44, 0x44, 0x44);
-    v.widgets.active.bg_fill = Color32::from_rgb(0x44, 0x44, 0x44);
-    v.widgets.active.corner_radius = r;
-    v.widgets.open.weak_bg_fill = BG3;
-    v.widgets.open.corner_radius = r;
+    let r = CornerRadius::same(10);
+    v.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, p.border);
+    v.widgets.noninteractive.corner_radius = r;
+    for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active, &mut v.widgets.open] {
+        w.corner_radius = r;
+        w.fg_stroke.color = p.fg;
+    }
+    v.widgets.inactive.weak_bg_fill = p.field;
+    v.widgets.inactive.bg_fill = p.field;
+    v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::TRANSPARENT);
+    v.widgets.hovered.weak_bg_fill = p.hover;
+    v.widgets.hovered.bg_fill = p.hover;
+    v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, p.border);
+    v.widgets.active.weak_bg_fill = p.hover;
+    v.widgets.active.bg_fill = p.accent;
+    v.widgets.active.bg_stroke = Stroke::new(1.0_f32, p.accent);
+    v.widgets.open.weak_bg_fill = p.field;
     ctx.set_visuals(v);
 
     ctx.style_mut(|s| {
         s.spacing.button_padding = Vec2::new(12.0, 6.0);
+        s.spacing.interact_size.y = 30.0;
         s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(13.5));
         s.text_styles.insert(egui::TextStyle::Button, FontId::proportional(13.5));
     });
@@ -2375,7 +2737,7 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(format!("RaskCut {APP_VERSION}"))
-            .with_inner_size([PW + PAD * 2.0, 620.0])
+            .with_inner_size([PW + (PAD + 4.0) * 2.0, 640.0])
             .with_resizable(false)
             .with_maximize_button(false)
             .with_drag_and_drop(true)

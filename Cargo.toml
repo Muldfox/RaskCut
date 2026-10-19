@@ -1,6 +1,6 @@
 [package]
 name = "raskcut"
-version = "1.2.1"          # This is APP_VERSION. Bump it here for each release.
+version = "1.3.0"          # This is APP_VERSION. Bump it here for each release.
 edition = "2021"
 
 [[bin]]
