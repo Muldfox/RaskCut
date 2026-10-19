@@ -32,15 +32,6 @@ Windows may say "Windows protected your PC". Click **More info** and then **Run 
 
 Prefer no installer? Grab the portable zip from the same page, unzip it anywhere and run `RaskCut.exe`.
 
-## Keyboard
-
-| Key | Action |
-| --- | --- |
-| Space | Play / stop |
-| Left / Right | Move the selected handle one frame |
-| Shift + Left / Right | Move the selected handle one second |
-| Esc | Stop editing a cut |
-
 ## Build from source
 
 1. Install Rust from https://rustup.rs
