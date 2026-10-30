@@ -1,28 +1,36 @@
 # RaskCut
 
-**From game clip to Discord in seconds.**
+**Cut your game clips and share them on Discord in seconds.**
 
-Fast game clip cutter for Discord, written in Rust. Your GPU already saves the moment. RaskCut turns it into a clip you can paste straight into Discord, small enough for a free account. No Nitro, no upload sites, no video editor to learn.
+RaskCut is a small, fast clip cutter written in Rust. Load the replay clips your GPU or recorder saved, pick the moments you want, and export a video that uploads to Discord on a free account. No Nitro, no upload sites, no video editor to learn.
 
 <p align="center">
   <img src="docs/screenshot.png" alt="RaskCut" width="600">
 </p>
 
-## Why RaskCut
+## What it does
 
 - **Fast.** Written in Rust. Opens instantly, scrubs instantly, exports in seconds. Uses your GPU for encoding when it can (NVIDIA, AMD or Intel).
-- **Always fits Discord.** Discord mode squeezes every clip under 10 MB, the free upload limit, and picks the best resolution and frame rate for the length of the clip.
-- **Ready to paste.** The finished clip is copied to your clipboard. Open Discord, press Ctrl+V, done.
-- **Lossless when you want to keep it.** Lossless mode cuts on the exact frame and keeps the original quality and every audio track (game, mic, voice chat).
+- **Always under 10 MB for Discord.** No Nitro needed.
+- **Highlights from several clips.** Load all the clips from a match, pick moments from each, and get one video.
+- **Ready to paste.** The finished video is copied to your clipboard. Open Discord, press Ctrl+V, done.
+- **Lossless when you want to keep it.** Cuts on the exact frame and keeps the original quality and every audio track (game, mic, voice chat).
 
 Works with clips from NVIDIA Instant Replay, AMD Adrenalin, OBS replay buffer, Steam and Xbox Game Bar. Supports MP4, MKV, MOV, AVI, WMV, FLV and WebM.
 
-## How it works
+### How the 10 MB limit works
 
-1. Drop a clip into RaskCut, or right-click it and choose **Open with**.
-2. Drag the handles to pick the moment. Scrub the preview to find it.
-3. Want a highlight reel? Click **Add cut** for each moment. They play and export as one video.
-4. Pick **Discord** or **Lossless** and click **Export**. Then paste it into Discord.
+RaskCut takes the total length of your video and works out how much data each second can use so the file ends up just under 10 MB. Short clips get high quality, long ones get a lower resolution so they still look clean. If a file still comes out too big, it's re-encoded smaller automatically.
+
+## How to use it
+
+1. Drop one or more clips into RaskCut, or click **Add clips**.
+2. Drag the handles to pick a moment. Press **Space** to check how it looks and sounds.
+3. Click **Add cut**. Repeat for every moment you want, in any of the clips.
+4. Press **Play** to watch the final video, all cuts back to back.
+5. Pick **Discord** or **Lossless**, click **Export**, and paste it into Discord.
+
+Just want one clip, no highlights? Skip **Add cut** and export the selection directly.
 
 ## Install
 
